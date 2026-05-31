@@ -18,6 +18,7 @@ import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.Clientbound
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.ServerboundChatCommandPacket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import top.ddddvvvv.listeners.RespawnPacketListener;
 import top.ddddvvvv.viaversion.ddddvvvvViaDecoder;
 import top.ddddvvvv.viaversion.ddddvvvvViaEncoder;
 import top.ddddvvvv.viaversion.ddddvvvvViaPlatform;
@@ -68,6 +69,7 @@ public class ddddvvvvMetaPlugin implements MetaPlugin {
 
     @Override
     public Server getServer(ClientboundLoginPacket loginPacket) {
+        log.info("{}", loginPacket);
         if (loginPacket.getCommonPlayerSpawnInfo().getGameMode() == GameMode.ADVENTURE) {
             loginFlow.reset();
             return Server.Login;
@@ -91,10 +93,10 @@ public class ddddvvvvMetaPlugin implements MetaPlugin {
 
     @Override
     public void onEnable() {
-        ClientSession session = Bot.INSTANCE.getSession();
         loginFlow.reset();
-        session.addListener(loginFlow);
-        session.addListener(new SessionAdapter() {
+        Bot.INSTANCE.addPacketListener(loginFlow, this);
+        Bot.INSTANCE.addPacketListener(new RespawnPacketListener(), this);
+        Bot.INSTANCE.addPacketListener(new SessionAdapter() {
             @Override
             public void packetSending(PacketSendingEvent event) {
                 if (setupDone) {
@@ -107,7 +109,7 @@ public class ddddvvvvMetaPlugin implements MetaPlugin {
                     setupViaHandlers(channel);
                 }
             }
-        });
+        }, this);
     }
 
     private void setupViaHandlers(Channel channel) {
