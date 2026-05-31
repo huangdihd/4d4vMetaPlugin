@@ -69,7 +69,6 @@ public class ddddvvvvMetaPlugin implements MetaPlugin {
 
     @Override
     public Server getServer(ClientboundLoginPacket loginPacket) {
-        log.info("{}", loginPacket);
         if (loginPacket.getCommonPlayerSpawnInfo().getGameMode() == GameMode.ADVENTURE) {
             loginFlow.reset();
             return Server.Login;
