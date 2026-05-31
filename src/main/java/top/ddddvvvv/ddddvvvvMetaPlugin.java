@@ -9,6 +9,7 @@ import com.viaversion.viaversion.connection.UserConnectionImpl;
 import com.viaversion.viaversion.protocol.ProtocolPipelineImpl;
 import com.viaversion.viaversion.ViaManagerImpl;
 import io.netty.channel.Channel;
+import lombok.Getter;
 import org.geysermc.mcprotocollib.network.ClientSession;
 import org.geysermc.mcprotocollib.network.event.session.PacketSendingEvent;
 import org.geysermc.mcprotocollib.network.event.session.SessionAdapter;
@@ -18,6 +19,8 @@ import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.Clientbound
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.ServerboundChatCommandPacket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import top.ddddvvvv.listeners.AutoJoinListener;
+import top.ddddvvvv.listeners.JoinButtonRecorder;
 import top.ddddvvvv.listeners.RespawnPacketListener;
 import top.ddddvvvv.viaversion.ddddvvvvViaDecoder;
 import top.ddddvvvv.viaversion.ddddvvvvViaEncoder;
@@ -40,7 +43,7 @@ public class ddddvvvvMetaPlugin implements MetaPlugin {
     private static final Logger log = LoggerFactory.getLogger("4d4vMetaPlugin");
     private UserConnection userConnection;
     private volatile boolean setupDone = false;
-    
+    @Getter
     private static final LoginFlow loginFlow = LoginFlow.builder(cmd -> Bot.INSTANCE.getSession().send(new ServerboundChatCommandPacket(cmd)))
             .eventManager(Bot.INSTANCE.getPluginManager().events())
             .templateExpander(t -> t.replace("{password}",
@@ -50,14 +53,13 @@ public class ddddvvvvMetaPlugin implements MetaPlugin {
                 .then("reg {password} {password}")
                 .register()
                 .successWhen(p -> Utils.toString(p.getContent()).equals("§8[§6玩家系统§8] §c已成功注册！"))
-                .skipWhen(p -> Utils.toString(p.getContent()).contains("§8[§6玩家系统§8] §c请输入“/login <密码>”以登录"))
+                .skipWhen(p -> Utils.toString(p.getContent()).contains("登录"))
                 .add()
             .step(ClientboundSystemChatPacket.class)
                 .match(p -> Utils.toString(p.getContent()).equals("§8[§6玩家系统§8] §c请输入“/login <密码>”以登录"))
                 .then("l {password}")
                 .login()
                 .successWhen(p -> Utils.toString(p.getContent()).equals("§8[§6玩家系统§8] §c已成功登录！"))
-                .onSuccess(p -> log.info("登录/注册成功"))
                 .add()
             .cooldown(2000)
             .build();
@@ -71,6 +73,7 @@ public class ddddvvvvMetaPlugin implements MetaPlugin {
     public Server getServer(ClientboundLoginPacket loginPacket) {
         if (loginPacket.getCommonPlayerSpawnInfo().getGameMode() == GameMode.ADVENTURE) {
             loginFlow.reset();
+            AutoJoinListener.last_action_time = System.currentTimeMillis();
             return Server.Login;
         }
         return Server.Game;
@@ -95,6 +98,8 @@ public class ddddvvvvMetaPlugin implements MetaPlugin {
         loginFlow.reset();
         Bot.INSTANCE.addPacketListener(loginFlow, this);
         Bot.INSTANCE.addPacketListener(new RespawnPacketListener(), this);
+        Bot.INSTANCE.addPacketListener(new JoinButtonRecorder(), this);
+        Bot.INSTANCE.addPacketListener(new AutoJoinListener(), this);
         Bot.INSTANCE.addPacketListener(new SessionAdapter() {
             @Override
             public void packetSending(PacketSendingEvent event) {
