@@ -1,13 +1,7 @@
 package top.ddddvvvv;
 
-import com.viaversion.viaversion.api.Via;
-import com.viaversion.viaversion.api.connection.ProtocolInfo;
 import com.viaversion.viaversion.api.connection.UserConnection;
-import com.viaversion.viaversion.api.protocol.packet.State;
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
-import com.viaversion.viaversion.connection.UserConnectionImpl;
-import com.viaversion.viaversion.protocol.ProtocolPipelineImpl;
-import com.viaversion.viaversion.ViaManagerImpl;
 import io.netty.channel.Channel;
 import lombok.Getter;
 import org.geysermc.mcprotocollib.network.ClientSession;
@@ -22,19 +16,13 @@ import org.slf4j.LoggerFactory;
 import top.ddddvvvv.listeners.AutoJoinListener;
 import top.ddddvvvv.listeners.JoinButtonRecorder;
 import top.ddddvvvv.listeners.RespawnPacketListener;
-import top.ddddvvvv.viaversion.ddddvvvvViaDecoder;
-import top.ddddvvvv.viaversion.ddddvvvvViaEncoder;
-import top.ddddvvvv.viaversion.ddddvvvvViaPlatform;
-import top.ddddvvvv.viaversion.ddddvvvvViaInjector;
-import top.ddddvvvv.viaversion.ddddvvvvViaPlatformLoader;
-import top.ddddvvvv.viaversion.ddddvvvvViaBackwardsPlatform;
+import xin.bbtt.via.XinViaProvider;
 import xin.bbtt.mcbot.Bot;
 import xin.bbtt.mcbot.LoginFlow.LoginFlow;
 import xin.bbtt.mcbot.Server;
 import xin.bbtt.mcbot.Utils;
 import xin.bbtt.mcbot.plugin.MetaPlugin;
 
-import java.io.File;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
@@ -81,12 +69,8 @@ public class ddddvvvvMetaPlugin implements MetaPlugin {
 
     @Override
     public void onLoad() {
-        ddddvvvvViaPlatform platform = new ddddvvvvViaPlatform();
-        ViaManagerImpl manager = new ViaManagerImpl(platform, new ddddvvvvViaInjector(), null, new ddddvvvvViaPlatformLoader());
-        Via.init(manager);
-        platform.getConf().reload();
-        manager.init();
-        new ddddvvvvViaBackwardsPlatform().init(new File("viabackwards"));
+        // ViaVersion/ViaBackwards are bootstrapped by the XinVia library plugin
+        // (declared as a dependency in plugin.yml), so nothing is initialized here.
     }
 
     @Override
@@ -117,29 +101,11 @@ public class ddddvvvvMetaPlugin implements MetaPlugin {
     }
 
     private void setupViaHandlers(Channel channel) {
-        if (Via.getManager() == null || Via.getManager().getProtocolManager() == null) {
-            log.warn("ViaVersion not ready yet");
-            return;
-        }
-
-        userConnection = new UserConnectionImpl(channel, true);
-
-        ProtocolInfo protocolInfo = userConnection.getProtocolInfo();
-        protocolInfo.setProtocolVersion(ProtocolVersion.v1_21_11);
-        protocolInfo.setServerProtocolVersion(ProtocolVersion.v1_21);
-        protocolInfo.setState(State.HANDSHAKE);
-        protocolInfo.setUuid(Bot.INSTANCE.getProtocol().getProfile().getId());
-
-        new ProtocolPipelineImpl(userConnection);
-
-        Via.getManager().getConnectionManager().onLoginSuccess(userConnection);
-
-        try {
-            channel.pipeline().addBefore("codec", "via-decoder", new ddddvvvvViaDecoder(userConnection));
-            channel.pipeline().addBefore("codec", "via-encoder", new ddddvvvvViaEncoder(userConnection));
-        } catch (Exception e) {
-            log.error("Failed to add handlers", e);
-        }
+        userConnection = XinViaProvider.setup(
+                channel,
+                ProtocolVersion.v1_21_11,
+                ProtocolVersion.v1_21,
+                Bot.INSTANCE.getProtocol().getProfile().getId());
     }
 
     @Override
@@ -147,25 +113,8 @@ public class ddddvvvvMetaPlugin implements MetaPlugin {
         setupDone = false;
 
         ClientSession session = Bot.INSTANCE.getSession();
-        if (session != null) {
-            Channel channel = session.getChannel();
-            if (channel != null) {
-                channel.eventLoop().execute(() -> {
-                    if (channel.pipeline().get("via-decoder") != null) {
-                        channel.pipeline().remove("via-decoder");
-                    }
-                    if (channel.pipeline().get("via-encoder") != null) {
-                        channel.pipeline().remove("via-encoder");
-                    }
-                });
-            }
-        }
-
-        if (userConnection != null) {
-            try {
-                userConnection.disconnect("Plugin disabled");
-            } catch (Exception ignored) {}
-            userConnection = null;
-        }
+        Channel channel = session != null ? session.getChannel() : null;
+        XinViaProvider.teardown(channel, userConnection);
+        userConnection = null;
     }
 }
