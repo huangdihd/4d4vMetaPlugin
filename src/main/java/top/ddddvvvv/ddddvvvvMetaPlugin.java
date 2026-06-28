@@ -101,15 +101,11 @@ public class ddddvvvvMetaPlugin implements MetaPlugin {
     }
 
     private void setupViaHandlers(Channel channel) {
-        // 4d4v.top is ~1.21 (a tiny gap from the 1.21.11 bot), so the play-phase setup() is
-        // the right, proven choice here. setupClient()'s full handshake/login translation is
-        // only needed for large version gaps (e.g. joining old modded servers).
-        userConnection = XinViaProvider.setup(
-                channel,
-                ProtocolVersion.v1_21_11,
-                ProtocolVersion.v1_21,
-                Bot.INSTANCE.getProtocol().getProfile().getId()
-        );
+        // Full client-side translation to the target server version (the bot's own version is
+        // auto-detected). Works for any gap and any server type — verified joining and staying
+        // on 4d4v.top (a Velocity+ViaVersion network). Installed on the first outgoing packet so
+        // the handshake is translated too.
+        userConnection = XinViaProvider.setupClient(channel, ProtocolVersion.v1_21);
     }
 
     @Override
